@@ -20,7 +20,7 @@ git clone https://github.com/NCAR/ccpp-doc.git
 cd ccpp-doc/CCPPtechnical
 make html
 ```
-This will generate a HTML files in *./build/html*.
+This will generate HTML files in *./build/html*.
 3.  Build the PDF document.
 ```
 cd ccpp-doc/CCPPtechnical
