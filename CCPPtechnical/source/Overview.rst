@@ -4,15 +4,16 @@
 CCPP Overview
 *************************
 
-.. warning:: The information in this document is up to date with the CCPP and GMTB SCM v3 public
-   release as of June 17, 2019. If you are a developer looking for more current information, please
-   obtain and build the up-to-date Technical Documentation from the master branch of the ccpp-framework
-   code repository:
+.. note:: The information in this document is updated periodically with changes to the CCPP and GMTB
+   SCM master branch. To obtain and build the latest available Technical Documentation from
+   this branch of the ccpp-doc code repository:
 
     .. code-block:: console
 
-       git clone https://github.com/NCAR/ccpp-framework
-       cd ccpp-framework/doc/CCPPtechnical   
+       git clone https://github.com/NCAR/ccpp-doc
+       cd ccpp-doc
+       git checkout master
+       cd CCPPtechnical
        make html
        make latexpdf
 
