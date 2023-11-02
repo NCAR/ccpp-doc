@@ -167,7 +167,7 @@ The five developmental suites are either analogues for current operational physi
 
 * The `Warn-on-Forecast System (WoFS) <https://wof.nssl.noaa.gov/>`_ suite is being used by the WoFS project at the National Severe Storms Laboratory (NSSL) for real-time and potential future operational high-resolution modeling products. The WoFS suite is identical to the RRFS_v1beta suite, except using `NSSL 2-moment <https://dtcenter.ucar.edu/GMTB/UFS_SRW_App_v2.2.0/sci_doc/_n_s_s_l_m_i_c_r_o_page.html>`_ microphysics.
 
-* Finally, the HRRR suite is similar to the operational High-Resolution Rapid Refresh (HRRR) model physics package, and is identical to the RAP suite except it does not have convective parameterization due to its intended use at higher convective-permitting resolutions. Additionally, new in SRW v2.2.0, the HRRR suite uses the `Community Land Model (CLM) lake model <https://dtcenter.ucar.edu/GMTB/UFS_SRW_App_v2.2.0/sci_doc/_c_l_m__l_a_k_e_model.html>`.
+* Finally, the HRRR suite is similar to the operational High-Resolution Rapid Refresh (HRRR) model physics package, and is identical to the RAP suite except it does not have convective parameterization due to its intended use at higher convective-permitting resolutions. Additionally, new in SRW v2.2.0, the HRRR suite uses the `Community Land Model (CLM) lake model <https://dtcenter.ucar.edu/GMTB/UFS_SRW_App_v2.2.0/sci_doc/_c_l_m__l_a_k_e_model.html>`_.
 
 Those interested in the history of previous CCPP releases should know that the
 first public release of the CCPP took place in April 2018 and included all the
