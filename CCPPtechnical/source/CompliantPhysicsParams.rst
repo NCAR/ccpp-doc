@@ -338,14 +338,7 @@ After the ``ccpp-arg-table``, there should be a metadata entry for every input a
 
 .. note:: The ``intent`` argument is only valid in ``scheme`` metadata tables, as it is not applicable to the other ``types``.
 
-* ``dimensions`` indicates the dimensionality of the variable. The dimensions attribute should be empty parentheses for scalars, or indicate the start and end of each dimension of an array with an appropriate standard name; see the `ESM Standard Names documentation <https://github.com/ESCOMP/ESMStandardNames/blob/main/Metadata-standard-names.md#dimensions>`__. ``ccpp_constant_one`` is the assumed start for any dimension which only has a single value. Some examples are listed here:
-
-.. code-block:: fortran
-
-   dimensions = ()
-   dimensions = (ccpp_constant_one:horizontal_loop_extent, vertical_level_dimension)
-   dimensions = (horizontal_dimension,vertical_dimension)
-   dimensions = (horizontal_dimension,vertical_dimension_of_ozone_forcing_data,number_of_coefficients_in_ozone_forcing_data)
+* ``dimensions`` indicates the dimensionality of the variable. See :numref:`Section %s <SchemeDimensionOptions>` for details.
 
 * ``type`` indicates the variable type. Can be ``character``, ``integer``, ``real``, ``complex``, ``logical``, ``ddt``, or a custom type defined by the host. Custom types must be listed under ``TYPEDEFS_NEW_METADATA`` in the prebuild configuration file.
 
@@ -374,20 +367,56 @@ After the ``ccpp-arg-table``, there should be a metadata entry for every input a
 .. warning::
    The ``pointer`` and ``rank`` attributes are deprecated and no longer allowed in CCPP
 
-.. _HorizontalDimensionOptionsSchemes:
+.. _SchemeDimensionOptions:
 
-``horizontal_dimension`` vs. ``horizontal_loop_extent``
--------------------------------------------------------
+Horizontal, vertical, and other dimensions
+------------------------------------------
+The dimensions attribute in metadata should indicate both the dimensionality of the data, as well as the breakdown of data among parallel processes. It should be empty parentheses for scalars, or indicate the start and end of each dimension of an array with an appropriate standard name as listed in the `ESM Standard Names documentation <https://github.com/ESCOMP/ESMStandardNames/blob/main/Metadata-standard-names.md#dimensions>`__. ``ccpp_constant_one`` is the assumed start for any dimension which only has a single value. Some examples are listed here:
 
-It is important to understand the difference between these metadata dimension names.
+.. code-block:: fortran
+
+   dimensions = ()
+   dimensions = (ccpp_constant_one:horizontal_loop_extent, vertical_level_dimension)
+   dimensions = (horizontal_dimension,vertical_dimension)
+   dimensions = (horizontal_dimension,vertical_dimension_of_ozone_forcing_data,number_of_coefficients_in_ozone_forcing_data)
+
+The standard names used for dimensions may come in sets of six related standard names for each dimension:
+
+::
+
+   [dim_name]_dimension -- The full dimension size
+   [dim_name]_loop_extent -- Size of dim for current call
+   [dim_name]_begin - Start index for dimension
+   [dim_name]_end - End index for dimension
+   [dim_name]_index - Single index for dimension
+   [dim_name]_selection - Array of selected indices for
+    dimension
+
+Dimension differences in different CCPP phases
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The CCPP cap generator will use different standard names for the CCPP *_run* `:term:`phases <phase>` vs other phases.
+This is because the *_run* phase supports OpenMP parallel threading, so dimension variables in the CCPP *_run* phase for a given scheme
+must refer to the ``loop_extent`` rather than the ``dimension`` for a variable's dimensional extent. As an example, the below dimensions
+on the left in the  *init*, *timestep_init*, *timestep_finalize*, and *finalize* phases (as well as the host model) will be substituted
+with the dimensions on the right in the *_run* phase:
+
+::
+
+   [dim_name]_dimension ==> ccpp_constant_one:[dim_name]_loop_extent
+   [dim_name]_loop_extent ==> ccpp_constant_one:[dim_name]_loop_extent
+   [dim_name]_begin:[dim_name]_end ==> ccpp_constant_one:[dim_name]_loop_extent
+   [dim_name]_begin:[dim_name]_end ==> ccpp_constant_one:[dim_name]_dimension
+
+To use the horizontal dimension as a specific example:
 
 * ``horizontal_dimension`` refers to all (horizontal) grid columns that an MPI process owns/is responsible for, and that are passed to the physics in the *init*, *timestep_init*, *timestep_finalize*, and *finalize* phases.
 
-* ``horizontal_loop_extent`` or, equivalent, ``ccpp_constant_one:horizontal_loop_extent`` stands for a subset of grid columns that are passed to the physics during the time integration, i.e. in the *run* phase.
+* ``horizontal_loop_extent``, or equivalently ``ccpp_constant_one:horizontal_loop_extent`` stands for a subset of grid columns that are passed to the physics during the time integration, i.e. in the *run* phase.
 
-* Note that ``horizontal_loop_extent`` is identical to ``horizontal_dimension`` for host models that pass all columns to the physics during the time integration.
-
-Since physics developers cannot know whether a host model is passing all columns to the physics during the time integration or just a subset of it, the following rules apply to all schemes:
+Note that ``horizontal_loop_extent`` is identical to ``horizontal_dimension`` for host models that pass all columns to the physics during the time integration.
+Since physics developers cannot know whether a host model is passing all columns to the physics during the time integration or just a subset of it,
+the following rules apply to all schemes:
 
 * Variables that depend on the horizontal decomposition must use
 
