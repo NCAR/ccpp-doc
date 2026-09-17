@@ -19,11 +19,7 @@ recommended to code two separate schemes to allow more flexibility.
 Some schemes in the CCPP have been implemented using a driver as an entry point. In this context,
 a driver is defined as a wrapper of code around the actual scheme, providing the CCPP entry
 points. In order to minimize the layers of code in the CCPP, the implementation of a driver is
-discouraged, that is, it is preferable that the CCPP be composed of atomic parameterizations. One
-example is the implementation of the MG microphysics, in which a simple entry point
-leads to two versions of the scheme, MG2 and MG3.  A cleaner implementation would be to retire MG2
-in favor of MG3, to turn MG2 and MG3 into separate schemes, or to create a single scheme that can behave
-as MG2 and MG3 depending on namelist options.
+discouraged, that is, it is preferable that the CCPP be composed of atomic parameterizations. 
 
 The implementation of a driver is reasonable under the following circumstances:
 
@@ -38,20 +34,14 @@ The implementation of a driver is reasonable under the following circumstances:
   in `ccpp-physics/physics/gfdl_cloud_microphys.F90 <https://github.com/NCAR/ccpp-physics/blob/da75531/physics/MP/GFDL/gfdl_cloud_microphys.F90>`__.
 
 Schemes in the CCPP are classified into two categories: :term:`primary schemes <primary scheme>` and :term:`interstitial schemes <interstitial scheme>`.
-A *primary* scheme is one that updates the state variables and tracers or that
-produces tendencies for updating state variables and tracers based on the
-representation of major physical processes, such as radiation, convection,
-microphysics, etc. This does **not** include:
+A *primary* scheme is one that produces tendencies of state variables and tracers. These tendencies are then used to update the state by subsequent interstitial scheme(s), or directly by the host model. Updating of the state variables should not occur within primary schemes. Please follow the following guidelines when creating a primary scheme:
 
-* Schemes that compute tendencies exclusively for diagnostic purposes.
+* All state variables provided to a CCPP primary scheme should be defined with intent IN.
 
-* Schemes that adjust tendencies for different timesteps (e.g., create radiation
-  tendencies based on a radiation scheme called at coarser intervals).
+* State variable tendencies should be provided by the CCPP primary scheme with intent OUT.
 
-* Schemes that update the model state based on tendencies generated in primary schemes.
-
-*Interstitial* schemes are modularized pieces of code that
-perform data preparation, diagnostics, or other “glue” functions, and allow primary schemes to work
+*Interstitial* schemes are modularized pieces of code that can be used to update the host's prognostic state variables, 
+perform data preparation, compute diagnostics, or other coupling functions, and allow primary schemes to work
 together as a :term:`suite`. They can be categorized as “scheme-specific” or “suite-level”. Scheme-specific
 interstitial schemes augment a specific primary scheme (to provide additional functionality).
 Suite-level interstitial schemes provide additional functionality on top of a class of primary schemes,
@@ -61,6 +51,9 @@ primary and interstitial schemes.
 
 CCPP-compliant physics parameterizations are broken down into one or more of the following five :term:`phases <phase>`:
 
+* The *register* phase, which performs actions needed before the host model grid information is known. 
+  Examples include querying other model components for information describing the active constituents, along with allocating internal variables needed by the CCPP framework.
+  Internal CCPP framework variables are dimensioned by the number of instances, which is set by the host. Detailed instructions for handling multiple CCPP instances are coming soon.
 * The *init* phase, which performs actions needed to set up the scheme before the model integration
   begins. Examples of actions needed in this phase include the reading/computation of
   lookup tables, setting of constants (as described in :numref:`Section %s <UsingConstants>`), etc.
@@ -69,9 +62,9 @@ CCPP-compliant physics parameterizations are broken down into one or more of the
   reading lookup table values, etc.
 * The *run* phase, which is the main body of the scheme. Here is where the physics is integrated
   forward to the next timestep.
-* The *timestep_finalize* phase, which performs post-integration calculations such as computing
+* The *timestep_final* phase, which performs post-integration calculations such as computing
   statistics or diagnostic tendencies. Not currently used by any scheme.
-* The *finalize* phase, which performs cleanup and finalizing actions at the end of model integration.
+* The *final* phase, which performs cleanup and finalizing actions at the end of model integration.
   Examples of actions needed in this phase include deallocating variables, closing files, etc.
 
 The various phases have different rules when it comes to parallelization, especially with regards
@@ -83,16 +76,14 @@ for more information.
 General Rules
 =============
 A CCPP-compliant scheme is written in the form of Fortran modules. Each scheme must be in its own module, and must include at least one of the
-following subroutines (*entry points*): *_init*, *_timestep_init*, *_run*, *_timestep_finalize*,
-and *_finalize*. Each subroutine corresponds to one of the five *phases* of the :term:`CCPP Framework` as described above.
-The module name and the subroutine names must be consistent with the
-scheme name; for example, the scheme "schemename" can have the entry points *schemename_init*,
-*schemename_run*, etc. The *_run* subroutine contains the
-code to execute the scheme. If subroutines *_timestep_init* or *_timestep_finalize* are present,
+following subroutines (*entry points*): *_register*, *_init*, *_timestep_init*, *_run*, *_timestep_final*,
+and *_final*. Each subroutine corresponds to one of the six *phases* of the :term:`CCPP Framework` as described above.
+The *_run* subroutine contains the code to execute the scheme. If subroutines *_timestep_init* or *_timestep_final* are present,
 they will be executed at the beginning and at the end of the :term:`host model` physics timestep,
-respectively. Further, if present, the *_init* and *_finalize* subroutines
+respectively. If subroutine *_register* is present, it will be called by the host-model BEFORE
+calling any other the CCPP phases. Further, if present, the *_init* and *_final* subroutines
 associated with a scheme are run at the beginning and at the end of the model run.
-The *_init* and *_finalize* subroutines may be called more than once depending
+The *_init* and *_final* subroutines may be called more than once depending
 on the host model’s parallelization strategy, and as such must be idempotent (the answer
 must be the same when the subroutine is called multiple times). This can be achieved
 by using a module variable ``is_initialized`` that keeps track whether a scheme has been
@@ -109,7 +100,7 @@ same directory as described in :numref:`Section %s <MetadataRules>`
    :language: fortran
    :lines: 10-48
 
-*Listing 2.1: Fortran template for a CCPP-compliant scheme showing the _run subroutine. The structure for the other phases (*\ _timestep_init, _init, _finalize, *and* _timestep_finalize\ *) is identical.*
+*Listing 2.1: Fortran template for a CCPP-compliant scheme showing the _run subroutine. The structure for the other phases (*\ _register, _timestep_init, _init, _final, *and* _timestep_final\ *) is identical.*
 
 The three lines in the example template beginning ``!> \section`` are required. They begin with `!` and so will be treated as comments by the Fortran compiler, but are interpreted by Doxygen
 as part of the process to create scientific documentation. Those lines specifically insert an external file containing metadata
@@ -147,11 +138,14 @@ The ``[ccpp-table-properties]`` section is required in every metadata file and h
 #. ``type``:  In the CCPP Physics, ``type`` can be ``scheme``, ``module``, or ``ddt`` (derived data type) and must match the
    ``type`` in the associated ``[ccpp-arg-table]`` section(s).
 
+#. ``type``:  In the Host model, ``type`` can be ``host``, ``control``, or ``ddt`` (derived data type) and must match the
+   ``type`` in the associated ``[ccpp-arg-table]`` section(s). See :numref:`Section %s <VariableTablesHostModel>` for more details regarding Host model metadata requirements.
+
 #. ``name``:  This depends on the ``type``. For types ``ddt`` and ``module`` (for
    variable/type/kind definitions), ``name`` must match the name of the **single** associated
    ``[ccpp-arg-table]`` section. For type ``scheme``, the name must match the root names of the
    ``[ccpp-arg-table]`` sections for that scheme, without the suffixes
-   ``_timestep_init``, ``_init``, ``_run``, ``_finalize``, or ``_timestep_finalize``.
+   ``_register``, ``_init``, ``_timestep_init``, ``_run``, ``_timestep_final``, or ``_final``.
 
 #. ``dependencies``: type/kind/variable definitions and physics schemes often depend on code in other files
    (e.g. "use machine" --> depends on ``machine.F``). These dependencies must be provided as a comma-separated list.
@@ -263,7 +257,7 @@ An example metadata file for the CCPP scheme ``mp_thompson.meta`` (with many sec
      name = mp_thompson_run
      type = scheme
    [ncol]
-     standard_name = horizontal_loop_extent
+     standard_name = horizontal_dimension
      long_name = horizontal loop extent
      units = count
      dimensions = ()
@@ -273,7 +267,7 @@ An example metadata file for the CCPP scheme ``mp_thompson.meta`` (with many sec
 
    ########################################################################
    [ccpp-arg-table]
-     name = mp_thompson_finalize
+     name = mp_thompson_final
      type = scheme
    [errmsg]
      standard_name = ccpp_error_message
@@ -287,7 +281,7 @@ An example metadata file for the CCPP scheme ``mp_thompson.meta`` (with many sec
 
 *Listing 2.3: Example metadata file for a CCPP-compliant physics scheme using a single*
 ``[ccpp-table-properties]`` *entry and how it defines dependencies for multiple* ``[ccpp-arg-table]`` *entries.
-In this example the* timestep_init *and* timestep_finalize *phases are not used*.
+In this example the* timestep_init *and* timestep_final *phases are not used*.
 
 ccpp-arg-table
 --------------
@@ -319,6 +313,7 @@ After the ``ccpp-arg-table``, there should be a metadata entry for every input a
     kind = <kind>
     intent = <intent>
     optional = <True,False>
+    top_at_one = <True,False>
 
 
 * ``[varname]`` is the local name of the variable in the subroutine.
@@ -343,17 +338,19 @@ After the ``ccpp-arg-table``, there should be a metadata entry for every input a
 .. code-block:: fortran
 
    dimensions = ()
-   dimensions = (ccpp_constant_one:horizontal_loop_extent, vertical_level_dimension)
+   dimensions = (ccpp_constant_one:horizontal_dimension, vertical_level_dimension)
    dimensions = (horizontal_dimension,vertical_dimension)
    dimensions = (horizontal_dimension,vertical_dimension_of_ozone_forcing_data,number_of_coefficients_in_ozone_forcing_data)
 
-* ``type`` indicates the variable type. Can be ``character``, ``integer``, ``real``, ``complex``, ``logical``, ``ddt``, or a custom type defined by the host. Custom types must be listed under ``TYPEDEFS_NEW_METADATA`` in the prebuild configuration file.
+* ``type`` indicates the variable type. Can be ``character``, ``integer``, ``real``, ``complex``, ``logical``, ``ddt``, or a custom type defined by the host. External (non-CCPP) types are also allowed and use the syntax: ``type = external:<module_name>:<type_name>``. For example, ``type = external:mpi_f08:mpi_comm``.
 
 * ``kind`` (*optional*) indicates the variable kind, i.e. precision. The valid kinds are defined in the file `physics/hooks/machine.F <https://github.com/NCAR/ccpp-physics/blob/main/physics/hooks/machine.F>`__.
 
 * ``intent`` indicates the argument intent for the given variable. Can be ``in``, ``out``, or ``inout``.
 
 * ``optional`` (*optional*) indicates whether an argument is optional or not. If omitted, argument is assumed to be required.
+
+* ``top_at_one`` (*optional*) indicates vertical orientation of variable. By default, this is set to False for all variables. This attribute can be set accordingly by the host and physics scheme(s) if there are different ordering conventions between them.
 
 * Lines can be combined using ``|`` as a separator, e.g.,
 
@@ -374,26 +371,6 @@ After the ``ccpp-arg-table``, there should be a metadata entry for every input a
 .. warning::
    The ``pointer`` and ``rank`` attributes are deprecated and no longer allowed in CCPP
 
-.. _HorizontalDimensionOptionsSchemes:
-
-``horizontal_dimension`` vs. ``horizontal_loop_extent``
--------------------------------------------------------
-
-It is important to understand the difference between these metadata dimension names.
-
-* ``horizontal_dimension`` refers to all (horizontal) grid columns that an MPI process owns/is responsible for, and that are passed to the physics in the *init*, *timestep_init*, *timestep_finalize*, and *finalize* phases.
-
-* ``horizontal_loop_extent`` or, equivalent, ``ccpp_constant_one:horizontal_loop_extent`` stands for a subset of grid columns that are passed to the physics during the time integration, i.e. in the *run* phase.
-
-* Note that ``horizontal_loop_extent`` is identical to ``horizontal_dimension`` for host models that pass all columns to the physics during the time integration.
-
-Since physics developers cannot know whether a host model is passing all columns to the physics during the time integration or just a subset of it, the following rules apply to all schemes:
-
-* Variables that depend on the horizontal decomposition must use
-
-  * ``horizontal_dimension`` in the metadata tables for the following phases: *init*, *timestep_init*, *timestep_finalize*, *finalize*.
-
-  * ``horizontal_loop_extent`` or ``ccpp_constant_one:horizontal_loop_extent`` in the *run* phase.
 
 .. _StandardNames:
 
@@ -413,8 +390,7 @@ additional names are used in the CCPP to cover the wide range of use cases the C
 Each hash of the CCPP Physics repository contains information in the top-level ``README.md`` file
 indicating which version of the CCPPStandardNames repository corresponds to that version of CCPP code.
 
-An up-to-date list of available standard names for a given host model can be found by running the CCPP *prebuild* script (described in :numref:`Chapter %s <CCPPPreBuild>`), which will generate a LaTeX source file that can be compiled to produce a PDF file with all variables
-defined by the host model and requested by the physics schemes.
+An up-to-date list of available standard names for a given host model can be found by running the CCPP *capgen* scripts (described in :numref:`Section %s <ccpp_datafile>`).
 
 .. _IOVariableRules:
 
@@ -517,7 +493,7 @@ Input/Output Variable (argument) Rules
        standard_name = surface_air_pressure
        long_name = surface pressure
        units = Pa
-       dimensions = (horizontal_loop_extent)
+       dimensions = (horizontal_dimension)
        type = real
        kind = kind_phys
        intent = in 
@@ -525,7 +501,7 @@ Input/Output Variable (argument) Rules
        standard_name = atmosphere_boundary_layer_thickness
        long_name = PBL thickness
        units = m
-       dimensions = (horizontal_loop_extent)
+       dimensions = (horizontal_dimension)
        type = real
        kind = kind_phys 
        intent = in
@@ -533,7 +509,7 @@ Input/Output Variable (argument) Rules
        standard_name = area_type
        long_name = landmask: sea/land/ice=0/1/2
        units = flag
-       dimensions = (horizontal_loop_extent)
+       dimensions = (horizontal_dimension)
        type = real
        kind = kind_phys
        intent = in
@@ -545,7 +521,7 @@ Input/Output Variable (argument) Rules
        standard_name = water_vapor_mixing_ratio_at_surface_over_land
        long_name = water vapor mixing ratio at surface over land
        units = kg kg-1
-       dimensions = (horizontal_loop_extent)
+       dimensions = (horizontal_dimension)
        type = real
        kind = kind_phys
        intent = in
@@ -554,7 +530,7 @@ Input/Output Variable (argument) Rules
        standard_name = water_vapor_mixing_ratio_at_surface_over_ice
        long_name = water vapor mixing ratio at surface over ice
        units = kg kg-1
-       dimensions = (horizontal_loop_extent)
+       dimensions = (horizontal_dimension)
        type = real
        kind = kind_phys
        intent = in
@@ -670,7 +646,7 @@ Within the ``_init`` subroutine body, the constants in the ``my_scheme_common`` 
      use machine, only: kind_phys
      implicit none
      private
-     public my_scheme_init, my_scheme_run, my_scheme_finalize
+     public my_scheme_init, my_scheme_run, my_scheme_final
      logical :: is_initialized = .false.
    contains
      subroutine my_scheme_init (a, b, con_pi, con_omega)
@@ -688,14 +664,14 @@ Within the ``_init`` subroutine body, the constants in the ``my_scheme_common`` 
          ...
      end subroutine my_scheme_run
 
-     subroutine my_scheme_finalize
+     subroutine my_scheme_final
          ...
        is_initialized = .false.
        pi = -999.
        omega1 = -999.
        omega2 = -999.
          ...
-     end subroutine my_scheme_finalize
+     end subroutine my_scheme_final
    end module my_scheme
 
 After this point, physical constants can be imported from ``my_scheme_common`` wherever they are
@@ -706,7 +682,7 @@ are coming from the host model cannot use the Fortran ``parameter`` keyword. To 
 inadvertently using constants in ``my_scheme_common`` without setting them from the host, they
 should be initially set to some invalid value. The above example also demonstrates the use of
 ``is_initialized`` to guarantee idempotence of the ``_init`` routine. To clean up during the
-finalize phase of the scheme, the ``is_initialized`` flag can be set back to false and the
+final phase of the scheme, the ``is_initialized`` flag can be set back to false and the
 constants can be set back to an invalid value.
 
 In summary, there are two ways to pass constants to a physics scheme.  The first is to directly pass constants via the subroutine interface and continue passing them down to all subroutines as needed. The second is to have a user-specified scheme constants module within the scheme and to sync it once with the physical constants from the host model at initialization time. The approach to use is somewhat up to the developer.
@@ -741,7 +717,7 @@ However, the following rules should be observed when including OpenMP or MPI com
   that the number of OpenMP threads to use is obtained from the host model as an ``intent(in)``
   argument in the argument list (:ref:`Listing 6.2 <MandatoryVariables>`).
 
-* MPI communication is allowed in the *init*, *timestep_init*, *timestep_finalize*, and *finalize*,
+* MPI communication is allowed in the *init*, *timestep_init*, *timestep_final*, and *final*,
   phases for the purpose of computing, reading or writing
   scheme-specific data that is independent of the host model’s data decomposition.
 
