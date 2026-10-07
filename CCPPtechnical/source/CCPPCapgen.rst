@@ -218,7 +218,9 @@ The Capgen validation stage provides robust error checking between the fortran a
 CCPP Physics Variable Tracker
 ========================================================
 
-The Capgen variable tracker allows for host introspection. After creating a ccpp_datatable, the ccpp_vartracker.py script can be use to retrieve information. Below are some examples:
+The Capgen variable tracker allows for host modelintrospection. After creating a ccpp_datatable, the ccpp_vartracker.py script can be use to retrieve information.
+
+Below are some examples using the end-to-end tests:
 
 .. code-block:: console
 
@@ -228,7 +230,7 @@ The Capgen variable tracker allows for host introspection. After creating a ccpp
      minimum_temperature_for_cloud_liquid
      tendency_of_cloud_liquid_dry_mixing_ratio
 
-*Listing 8.12: Find the standard name you want. In this case any standard_name that contains "cloud" in the advection end-to-end test.*
+*Listing 8.12: Find the standard name you want.*
 
 
 .. code-block:: console
@@ -243,7 +245,7 @@ The Capgen variable tracker allows for host introspection. After creating a ccpp
         - temp_calc_adjust
         - temp_adjust
 		
-*Listing 8.13: See the order schemes run in a suite. Here we retrieve the schemes order from the capgen ened-to-end test.*
+*Listing 8.13: See the order schemes run in a suite.*
 
 
 .. code-block:: console
