@@ -218,4 +218,128 @@ The Capgen validation stage provides robust error checking between the fortran a
 CCPP Physics Variable Tracker
 ========================================================
 
-WIP
+The Capgen variable tracker allows for host model introspection. After creating a ccpp_datatable, the ccpp_vartracker.py script can be use to retrieve information.
+
+Below are some examples using the end-to-end tests:
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/advection/ccpp/datatable.xml --search cloud
+     cloud_ice_dry_mixing_ratio
+     cloud_liquid_dry_mixing_ratio
+     minimum_temperature_for_cloud_liquid
+     tendency_of_cloud_liquid_dry_mixing_ratio
+
+*Listing 8.12: Find the standard name you want.*
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/capgen/ccpp/datatable.xml --suite-structure temp_suite
+
+    Suite: temp_suite
+      Group: physics1
+        - temp_set
+        - setup_coeffs
+      Group: physics2
+        - temp_calc_adjust
+        - temp_adjust
+		
+*Listing 8.13: See the order schemes run in a suite.*
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/advection/ccpp/datatable.xml --trace horizontal_dimension --suite cld_suite
+
+    === Trace of 'horizontal_dimension' in suite 'cld_suite' ===
+    1. reads   [physics] cld_liq.run (cld_liq_run in cld_liq):          intent=in     local_name=ncol
+    2. reads   [physics] cld_ice.run (cld_ice_run in cld_ice):          intent=in     local_name=ncol
+    3. reads   [physics] cld_shadow.run (cld_shadow_run in cld_shadow): intent=in     local_name=ncol
+
+*Listing 8.14: Trace a variable through a suite in call order.*
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_datafile.py build/advection/ccpp/datatable.xml --suite-variables cld_suite
+
+    cld_suite
+    cld_shadow_column_scratch,cld_shadow_scratch_array,minimum_temperature_for_cloud_liquid
+
+  $ capgen/ccpp_vartracker.py build/advection/ccpp/datatable.xml --trace cld_shadow_column_scratch --suite cld_suite
+
+    === Trace of 'cld_shadow_column_scratch' in suite 'cld_suite' ===
+   (suite-owned variable, allocated by capgen; first produced in cld_shadow.run)
+    1. WRITES  [physics] cld_shadow.run (cld_shadow_run in cld_shadow): intent=out    local_name=ncols
+
+*Listing 8.15: Find where a suite-owned variable is created. *
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/advection/ccpp/datatable.xml --origin cld_shadow_column_scratch
+
+    cld_shadow_column_scratch: suite-owned in 'cld_suite'
+    local_name: ncols
+    units: count
+    type: real
+    kind: kind_phys
+    dimensions: horizontal_dimension
+    source_scheme: cld_shadow
+    source_phase: run
+		
+*Listing 8.16: Check where a variable comes from. In this case the variable is a framework controlled suite variable*
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/advection/ccpp/datatable.xml --origin horizontal_dimension
+
+    horizontal_dimension: provided by the HOST (local_name=ncols, protected)
+		
+*Listing 8.17: Check where a variable comes from. Here the variable is a protected HOST variable.*
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/capgen/ccpp/datatable.xml --list-calls horizontal_dimension
+
+    === horizontal_dimension  (7 call(s)) [host var, protected] ===
+    environ_conditions.init (environ_conditions_init in environ_conditions): intent=in     local_name=nbox
+    make_ddt.init (make_ddt_init in make_ddt): intent=in     local_name=nbox
+    make_ddt.timestep_final (make_ddt_timestep_final in make_ddt): intent=in     local_name=ncols
+    temp_adjust.run (temp_adjust_run in temp_adjust): intent=in     local_name=foo
+    temp_calc_adjust.run (temp_calc_adjust_run in temp_calc_adjust): intent=in     local_name=nbox
+    temp_set.run (temp_set_run in temp_set): intent=in     local_name=ncol
+    temp_set.timestep_init (temp_set_timestep_init in temp_set): intent=in     local_name=ncol
+		
+*Listing 8.18: List every call that uses a variable, across all suites and phases.*
+
+
+.. code-block:: console
+
+  $ capgen/ccpp_vartracker.py build/capgen/ccpp/datatable.xml --scheme-calls make_ddt Scheme: make_ddt
+
+  [init] make_ddt_init (module make_ddt)
+    intent=in     local_name=nbox                 horizontal_dimension
+    intent=out    local_name=vmr                  volume_mixing_ratio_ddt
+    intent=out    local_name=errmsg               ccpp_error_message
+    intent=out    local_name=errflg               ccpp_error_code
+
+  [run] make_ddt_run (module make_ddt)
+    intent=in     local_name=cols                 horizontal_loop_begin
+    intent=in     local_name=cole                 horizontal_loop_end
+    intent=in     local_name=O3                   ozone
+    intent=in     local_name=HNO3                 nitric_acid
+    intent=inout  local_name=vmr                  volume_mixing_ratio_ddt
+    intent=out    local_name=errmsg               ccpp_error_message
+    intent=out    local_name=errflg               ccpp_error_code
+
+  [timestep_final] make_ddt_timestep_final (module make_ddt)
+    intent=in     local_name=ncols                horizontal_dimension
+    intent=in     local_name=vmr                  volume_mixing_ratio_ddt
+    intent=out    local_name=errmsg               ccpp_error_message
+    intent=out    local_name=errflg               ccpp_error_code
+		
+*Listing 8.19: Show one scheme's full argument list, or one group's external interface.*
