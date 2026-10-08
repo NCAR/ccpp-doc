@@ -218,7 +218,7 @@ The Capgen validation stage provides robust error checking between the fortran a
 CCPP Physics Variable Tracker
 ========================================================
 
-The Capgen variable tracker allows for host modelintrospection. After creating a ccpp_datatable, the ccpp_vartracker.py script can be use to retrieve information.
+The Capgen variable tracker allows for host model introspection. After creating a ccpp_datatable, the ccpp_vartracker.py script can be use to retrieve information.
 
 Below are some examples using the end-to-end tests:
 
